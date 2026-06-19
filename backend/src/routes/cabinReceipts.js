@@ -60,6 +60,13 @@ router.post('/confirm', (req, res) => {
     return res.status(404).json({ success: false, message: '航班不存在' });
   }
 
+  const existingReceipt = db.prepare(
+    'SELECT * FROM cabin_receipts WHERE flight_id = ? AND is_locked = 1'
+  ).get(flight_id);
+  if (existingReceipt) {
+    return res.status(400).json({ success: false, message: '该航班已锁定，不能再确认接收' });
+  }
+
   const boxes = db.prepare(`
     SELECT mb.*, mt.code as meal_type_code, mt.name as meal_type_name, mt.is_allergy
     FROM meal_boxes mb
@@ -102,16 +109,19 @@ router.post('/confirm', (req, res) => {
   }
 
   const is_confirmed = issues.length === 0;
+  const isDeparted = new Date(flight.scheduled_departure_time) <= new Date();
+  const is_locked = is_confirmed && isDeparted ? 1 : 0;
 
   const stmt = db.prepare(`
-    INSERT INTO cabin_receipts (flight_id, purser_id, purser_name, receipt_time, is_confirmed, remark)
-    VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?)
+    INSERT INTO cabin_receipts (flight_id, purser_id, purser_name, receipt_time, is_confirmed, is_locked, remark)
+    VALUES (?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?)
   `);
   const result = stmt.run(
     flight_id,
     purser_id,
     purser_name,
     is_confirmed ? 1 : 0,
+    is_locked,
     remark
   );
 
@@ -123,15 +133,78 @@ router.post('/confirm', (req, res) => {
     `).run(flight_id);
   }
 
+  if (is_locked) {
+    db.prepare(`
+      UPDATE meal_boxes SET updated_at = CURRENT_TIMESTAMP WHERE flight_id = ? AND status = 'loaded'
+    `).run(flight_id);
+  }
+
   res.json({
     success: true,
     data: {
       ...receipt,
       boxes: boxes,
       issues: issues,
-      is_confirmed: is_confirmed
+      is_confirmed: is_confirmed,
+      is_locked: is_locked
     }
   });
+});
+
+router.post('/lock/:id', (req, res) => {
+  const receipt = db.prepare('SELECT * FROM cabin_receipts WHERE id = ?').get(req.params.id);
+  if (!receipt) {
+    return res.status(404).json({ success: false, message: '接收记录不存在' });
+  }
+
+  if (receipt.is_locked) {
+    return res.status(400).json({ success: false, message: '该记录已锁定' });
+  }
+
+  if (!receipt.is_confirmed) {
+    return res.status(400).json({ success: false, message: '未确认接收，不能锁定' });
+  }
+
+  const flight = db.prepare('SELECT * FROM flights WHERE id = ?').get(receipt.flight_id);
+  if (!flight || new Date(flight.scheduled_departure_time) > new Date()) {
+    return res.status(400).json({ success: false, message: '航班未起飞，不能锁定' });
+  }
+
+  db.prepare(`
+    UPDATE cabin_receipts SET is_locked = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+  `).run(req.params.id);
+
+  const updatedReceipt = db.prepare('SELECT * FROM cabin_receipts WHERE id = ?').get(req.params.id);
+  res.json({ success: true, data: updatedReceipt });
+});
+
+router.post('/diff-description/:id', (req, res) => {
+  const receipt = db.prepare('SELECT * FROM cabin_receipts WHERE id = ?').get(req.params.id);
+  if (!receipt) {
+    return res.status(404).json({ success: false, message: '接收记录不存在' });
+  }
+
+  if (!receipt.is_locked) {
+    return res.status(400).json({ success: false, message: '记录未锁定，请先确认并锁定' });
+  }
+
+  const { diff_description, responsible_person } = req.body;
+
+  if (!diff_description && !responsible_person) {
+    return res.status(400).json({ success: false, message: '至少提供差异说明或责任人' });
+  }
+
+  const stmt = db.prepare(`
+    UPDATE cabin_receipts SET
+      diff_description = COALESCE(?, diff_description),
+      responsible_person = COALESCE(?, responsible_person),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE id = ?
+  `);
+  stmt.run(diff_description, responsible_person, req.params.id);
+
+  const updatedReceipt = db.prepare('SELECT * FROM cabin_receipts WHERE id = ?').get(req.params.id);
+  res.json({ success: true, data: updatedReceipt });
 });
 
 module.exports = router;

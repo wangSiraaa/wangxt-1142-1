@@ -42,9 +42,28 @@ function initDatabase() {
       flight_id INTEGER NOT NULL,
       meal_type_id INTEGER NOT NULL,
       quantity INTEGER NOT NULL,
+      previous_quantity INTEGER,
+      waitlist_quantity INTEGER NOT NULL DEFAULT 0,
       dispatcher_id TEXT,
       dispatcher_name TEXT,
       status TEXT NOT NULL DEFAULT 'pending',
+      remark TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (flight_id) REFERENCES flights(id),
+      FOREIGN KEY (meal_type_id) REFERENCES meal_types(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS waitlist_passengers (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      flight_id INTEGER NOT NULL,
+      passenger_name TEXT NOT NULL,
+      meal_type_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'waitlist',
+      transferred_at TEXT,
+      operator_id TEXT,
+      operator_name TEXT,
       remark TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -62,10 +81,55 @@ function initDatabase() {
       loader_id TEXT,
       loader_name TEXT,
       status TEXT NOT NULL DEFAULT 'prepared',
+      replace_status TEXT DEFAULT NULL,
+      replace_reason TEXT,
+      replace_reviewer_id TEXT,
+      replace_reviewer_name TEXT,
+      replace_reviewed_at TEXT,
       loaded_time TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (flight_id) REFERENCES flights(id),
+      FOREIGN KEY (meal_type_id) REFERENCES meal_types(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS box_replacements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      original_box_id INTEGER NOT NULL,
+      flight_id INTEGER NOT NULL,
+      old_box_no TEXT NOT NULL,
+      new_box_no TEXT NOT NULL,
+      meal_type_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL,
+      reason TEXT NOT NULL,
+      anomaly_type TEXT NOT NULL,
+      operator_id TEXT,
+      operator_name TEXT,
+      reviewer_id TEXT,
+      reviewer_name TEXT,
+      review_status TEXT NOT NULL DEFAULT 'pending',
+      reviewed_at TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (original_box_id) REFERENCES meal_boxes(id),
+      FOREIGN KEY (flight_id) REFERENCES flights(id),
+      FOREIGN KEY (meal_type_id) REFERENCES meal_types(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS allergy_isolations (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      flight_id INTEGER NOT NULL,
+      box_id INTEGER NOT NULL,
+      meal_type_id INTEGER NOT NULL,
+      isolation_method TEXT,
+      operator_id TEXT,
+      operator_name TEXT,
+      confirmed_by TEXT,
+      confirmed_name TEXT,
+      confirmed_at TEXT,
+      remark TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (flight_id) REFERENCES flights(id),
+      FOREIGN KEY (box_id) REFERENCES meal_boxes(id),
       FOREIGN KEY (meal_type_id) REFERENCES meal_types(id)
     );
 
@@ -89,8 +153,12 @@ function initDatabase() {
       purser_name TEXT,
       receipt_time TEXT,
       is_confirmed INTEGER NOT NULL DEFAULT 0,
+      is_locked INTEGER NOT NULL DEFAULT 0,
+      diff_description TEXT,
+      responsible_person TEXT,
       remark TEXT,
       created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (flight_id) REFERENCES flights(id)
     );
 

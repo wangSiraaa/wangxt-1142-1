@@ -36,6 +36,10 @@ export const mealRequirementApi = {
   create: (data) => api.post('/meal-requirements', data),
   update: (id, data) => api.put(`/meal-requirements/${id}`, data),
   remove: (id) => api.delete(`/meal-requirements/${id}`),
+  getWaitlist: (flightId) => api.get(`/meal-requirements/waitlist/${flightId}`),
+  addWaitlist: (data) => api.post('/meal-requirements/waitlist', data),
+  transferWaitlist: (id, data) => api.post(`/meal-requirements/waitlist/${id}/transfer`, data),
+  recalculate: (flightId, data) => api.post(`/meal-requirements/recalculate/${flightId}`, data),
 };
 
 export const mealBoxApi = {
@@ -45,6 +49,11 @@ export const mealBoxApi = {
   update: (id, data) => api.put(`/meal-boxes/${id}`, data),
   load: (id, data) => api.post(`/meal-boxes/${id}/load`, data),
   remove: (id) => api.delete(`/meal-boxes/${id}`),
+  reportAnomaly: (id, data) => api.post(`/meal-boxes/${id}/report-anomaly`, data),
+  getReplacements: (flightId) => api.get(`/meal-boxes/replacements/${flightId}`),
+  reviewReplacement: (id, data) => api.post(`/meal-boxes/replacements/${id}/review`, data),
+  addAllergyIsolation: (data) => api.post('/meal-boxes/allergy-isolation', data),
+  getAllergyIsolations: (flightId) => api.get(`/meal-boxes/allergy-isolations/${flightId}`),
 };
 
 export const loadingCheckApi = {
@@ -58,6 +67,8 @@ export const cabinReceiptApi = {
   getLatest: (flightId) => api.get(`/cabin-receipts/latest/${flightId}`),
   getBoxes: (flightId) => api.get(`/cabin-receipts/boxes/${flightId}`),
   confirm: (data) => api.post('/cabin-receipts/confirm', data),
+  lock: (id) => api.post(`/cabin-receipts/lock/${id}`),
+  addDiffDescription: (id, data) => api.post(`/cabin-receipts/diff-description/${id}`, data),
 };
 
 export const userApi = {
